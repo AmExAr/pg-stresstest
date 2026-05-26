@@ -1,41 +1,50 @@
 package main
 
 import (
+	"context"
 	"log"
 	"pg-stresstest/db"
 	"pg-stresstest/model"
 	"pg-stresstest/worker"
+	"sync"
 )
 
 func main() {
 	connString := "postgres://postgres:1234567890@localhost:5432/postgres"
 	THREADS := 10
+	ITERATIONS := 1000000
 
 	conn, err := db.ConnectDB(connString)
 	if err != nil {
 		log.Fatalf("Не удалось подключиться к БД: %s\n", err)
 	}
-	defer conn.Close(nil)
+	defer conn.Close(context.Background())
 
 	err = db.CreateTable(conn)
+	conn.Close(context.Background())
 	if err != nil {
 		log.Fatalf("Ошибка создания/проверки таблицы в БД: %s\n", err)
 	}
 
-	rdb := worker.RecordsDB{
+	rdb := &worker.RecordsDB{
 		Records: make(map[int]model.Record),
 	}
-	idChan := make(chan int)
+	idChan := make(chan int, 1)
+	var wg sync.WaitGroup
 
 	for i := 0; i < THREADS; i++ {
-		go worker.Worker(connString, &rdb, idChan)
+		wg.Add(1)
+		go worker.Worker(connString, rdb, idChan, &wg)
 	}
 
-	for i := 0; i < 1000000; i++ {
+	for i := 0; i < ITERATIONS; i++ {
 		idChan <- i
 	}
 
-	err = worker.GenerateCSV(&rdb, connString)
+	close(idChan)
+	wg.Wait()
+
+	err = worker.GenerateCSV(rdb, connString)
 	if err != nil {
 		log.Fatal(err)
 	}

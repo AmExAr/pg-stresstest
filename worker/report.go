@@ -1,6 +1,7 @@
 package worker
 
 import (
+	"context"
 	"encoding/csv"
 	"fmt"
 	"os"
@@ -14,13 +15,14 @@ func GenerateCSV(rdb *RecordsDB, connString string) error {
 	if err != nil {
 		return fmt.Errorf("Не удалось подключиться к БД: %s\n", err)
 	}
-	defer conn.Close(nil)
+	defer conn.Close(context.Background())
 
 	records, err := db.FetchTable(conn)
 	if err != nil {
 		return fmt.Errorf("Не удалось получить данные из БД: %s\n", err)
 	}
 
+	rdb.Mu.Lock()
 	for _, r := range records {
 		old := rdb.Records[r]
 		rdb.Records[r] = model.Record{
@@ -37,7 +39,6 @@ func GenerateCSV(rdb *RecordsDB, connString string) error {
 	defer file.Close()
 
 	writer := csv.NewWriter(file)
-	defer writer.Flush()
 
 	_ = writer.Write([]string{
 		"id",
@@ -55,5 +56,7 @@ func GenerateCSV(rdb *RecordsDB, connString string) error {
 		_ = writer.Write(row)
 	}
 
+	rdb.Mu.Unlock()
+	writer.Flush()
 	return nil
 }

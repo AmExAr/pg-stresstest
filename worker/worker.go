@@ -1,6 +1,7 @@
 package worker
 
 import (
+	"context"
 	"log"
 	"math/rand"
 	"pg-stresstest/db"
@@ -11,39 +12,31 @@ import (
 
 type RecordsDB struct {
 	Records map[int]model.Record
-	Mu      *sync.Mutex
+	Mu      sync.Mutex
 }
 
-func Worker(connString string, rdb *RecordsDB, idx chan int) {
+func Worker(connString string, rdb *RecordsDB, idx chan int, wg *sync.WaitGroup) {
+	defer wg.Done()
+
 	conn, err := db.ConnectDB(connString)
 	if err != nil {
 		log.Fatalf("Поток не установил соединение с БД: %s\n", err)
 	}
-	defer conn.Close(nil)
+	defer conn.Close(context.Background())
 
-	for {
-		id := <-idx
-
-		rdb.Mu.Lock()
+	for id := range idx {
 		err := db.InsertID(conn, id)
 
-		if err != nil {
-			rdb.Records[id] = model.Record{
-				ID:     id,
-				Sent:   false,
-				Exists: false,
-			}
-		} else {
-			rdb.Records[id] = model.Record{
-				ID:     id,
-				Sent:   true,
-				Exists: false,
-			}
+		rdb.Mu.Lock()
+		rdb.Records[id] = model.Record{
+			ID:     id,
+			Sent:   err == nil,
+			Exists: false,
 		}
 		rdb.Mu.Unlock()
 
 		time.Sleep(time.Duration(rand.Intn(500)) * time.Millisecond)
 
-		conn, _ := db.RecreateConnection(conn, connString)
+		conn, _ = db.RecreateConnection(conn, connString)
 	}
 }
