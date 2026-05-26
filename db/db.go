@@ -2,7 +2,6 @@ package db
 
 import (
 	"context"
-	"log"
 
 	"github.com/jackc/pgx/v5"
 )
@@ -42,7 +41,7 @@ func RecreateConnection(old *pgx.Conn, connString string) (*pgx.Conn, error) {
 		_ = old.Close(context.Background())
 	}
 
-	log.Println("Переподключение к бд...")
+	// log.Println("Переподключение к бд...")
 	return ConnectDB(connString)
 }
 

@@ -7,6 +7,8 @@ import (
 	"pg-stresstest/model"
 	"pg-stresstest/worker"
 	"sync"
+
+	"github.com/schollz/progressbar/v3"
 )
 
 func main() {
@@ -32,13 +34,15 @@ func main() {
 	idChan := make(chan int, 1)
 	var wg sync.WaitGroup
 
-	for i := 0; i < THREADS; i++ {
+	for range THREADS {
 		wg.Add(1)
 		go worker.Worker(connString, rdb, idChan, &wg)
 	}
 
-	for i := 0; i < ITERATIONS; i++ {
+	bar := progressbar.Default(int64(ITERATIONS))
+	for i := range ITERATIONS {
 		idChan <- i
+		bar.Add(1)
 	}
 
 	close(idChan)
