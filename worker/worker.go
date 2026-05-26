@@ -25,6 +25,29 @@ func Worker(connString string, rdb *RecordsDB, idx chan int, wg *sync.WaitGroup)
 	defer conn.Close(context.Background())
 
 	for id := range idx {
+		if conn == nil {
+			rdb.Mu.Lock()
+			rdb.Records[id] = model.Record{
+				ID:     id,
+				Sent:   false,
+				Exists: false,
+			}
+			rdb.Mu.Unlock()
+			conn, _ = db.RecreateConnection(conn, connString)
+			continue
+		}
+		if err := conn.Ping(context.Background()); err != nil {
+			rdb.Mu.Lock()
+			rdb.Records[id] = model.Record{
+				ID:     id,
+				Sent:   false,
+				Exists: false,
+			}
+			rdb.Mu.Unlock()
+			conn, _ = db.RecreateConnection(conn, connString)
+			continue
+		}
+
 		err := db.InsertID(conn, id)
 
 		rdb.Mu.Lock()
@@ -36,7 +59,5 @@ func Worker(connString string, rdb *RecordsDB, idx chan int, wg *sync.WaitGroup)
 		rdb.Mu.Unlock()
 
 		time.Sleep(time.Duration(rand.Intn(500)) * time.Millisecond)
-
-		conn, _ = db.RecreateConnection(conn, connString)
 	}
 }
