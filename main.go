@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"log"
+	"os"
 	"pg-stresstest/db"
 	"pg-stresstest/model"
 	"pg-stresstest/worker"
@@ -12,9 +13,9 @@ import (
 )
 
 func main() {
-	connString := "postgres://postgres:1234567890@localhost:5432/postgres"
-	THREADS := 10
-	ITERATIONS := 1000000
+	connString := os.Getenv("DB_CONN_STRING")
+	THREADS := 20
+	ITERATIONS := 10000
 
 	conn, err := db.ConnectDB(connString)
 	if err != nil {
